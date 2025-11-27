@@ -333,11 +333,19 @@ with tab2:
                 st.header("📊 Resultado da Predição")
                 
                 # Converter prediction para string se necessário
-                if isinstance(prediction, (np.integer, int)):
+                # Garantir que seja sempre uma string Python, não numpy type
+                if isinstance(prediction, (np.integer, int, np.int64, np.int32)):
                     # Se prediction é um índice, converter para string usando classes
-                    prediction_str = classes[prediction] if prediction < len(classes) else str(prediction)
+                    pred_idx = int(prediction)  # Converter para int Python
+                    if pred_idx < len(classes):
+                        prediction_str = str(classes[pred_idx])  # Converter explicitamente para string
+                    else:
+                        prediction_str = str(prediction)
                 else:
                     prediction_str = str(prediction)
+                
+                # Garantir que prediction_str é uma string Python, não numpy
+                prediction_str = str(prediction_str)
                 
                 # Resultado principal
                 prediction_pt = OBESITY_LEVELS_PT.get(prediction_str, prediction_str)
