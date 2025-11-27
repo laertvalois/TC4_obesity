@@ -1,0 +1,89 @@
+================================================================================
+TECH CHALLENGE 4 - SISTEMA PREDITIVO DE OBESIDADE
+FIAP - Machine Learning
+================================================================================
+
+INFORMAÇÕES DO PROJETO
+--------------------------------------------------------------------------------
+Nome do Projeto: Sistema Preditivo de Obesidade
+Disciplina: Tech Challenge 4
+Instituição: FIAP
+Data de Entrega: [PREENCHER DATA]
+
+EQUIPE
+--------------------------------------------------------------------------------
+Nome(s): [PREENCHER NOME(S)]
+RA(s): [PREENCHER RA(S)]
+
+LINKS PARA AVALIAÇÃO
+--------------------------------------------------------------------------------
+
+1. APLICAÇÃO PREDITIVA (STREAMLIT):
+   Link: [COLAR AQUI O LINK DO STREAMLIT CLOUD]
+   Exemplo: https://seu-usuario-streamlit-app.streamlit.app
+   
+   Descrição: Aplicação web interativa para previsão de níveis de obesidade.
+   Permite inserir dados do paciente e obter previsão em tempo real.
+
+2. DASHBOARD ANALÍTICO:
+   Link: [COLAR AQUI O LINK DO DASHBOARD - PODE SER A MESMA URL COM NAVEGAÇÃO]
+   Exemplo: https://seu-usuario-streamlit-app.streamlit.app (página "Insights e Métricas")
+   
+   Descrição: Painel analítico com insights estratégicos para equipe médica,
+   incluindo métricas do modelo, visualizações e recomendações clínicas.
+
+3. REPOSITÓRIO GITHUB:
+   Link: [COLAR AQUI O LINK DO REPOSITÓRIO]
+   Exemplo: https://github.com/seu-usuario/TC4_obesity
+   
+   Descrição: Repositório completo com todo o código desenvolvido, incluindo:
+   - Pipeline de ML (train_model.py)
+   - Aplicação Streamlit (app.py)
+   - Dataset e modelo treinado
+   - Documentação completa
+
+4. VÍDEO DE APRESENTAÇÃO:
+   Link: [COLAR AQUI O LINK DO VÍDEO - YOUTUBE/VIMEO]
+   Exemplo: https://www.youtube.com/watch?v=...
+   
+   Descrição: Vídeo de 4-10 minutos apresentando:
+   - Estratégia utilizada no desenvolvimento
+   - Pipeline de Machine Learning
+   - Demonstração do sistema preditivo
+   - Apresentação do dashboard analítico
+   - Insights para equipe médica (visão de negócio)
+
+RESUMO DO PROJETO
+--------------------------------------------------------------------------------
+
+OBJETIVO:
+Desenvolver um modelo de Machine Learning para auxiliar médicos e médicas
+a prever se uma pessoa pode ter obesidade, utilizando dados de questionários
+e características antropométricas.
+
+METODOLOGIA:
+- Feature Engineering: Criação de IMC, Risk Score e outras features derivadas
+- Múltiplos algoritmos testados: Gradient Boosting, Random Forest, SVM, KNN, etc.
+- Validação cruzada (5-fold) para seleção do melhor modelo
+- Pipeline completo de pré-processamento para produção
+
+RESULTADOS:
+- Modelo selecionado: [SERÁ PREENCHIDO APÓS TREINAMENTO]
+- Acurácia alcançada: [SERÁ PREENCHIDO APÓS TREINAMENTO] (> 75%)
+- Métricas detalhadas disponíveis em model/metrics.txt
+
+TECNOLOGIAS UTILIZADAS:
+- Python 3.x
+- Scikit-learn (Machine Learning)
+- Streamlit (Interface Web)
+- Pandas, NumPy (Manipulação de Dados)
+- Matplotlib, Seaborn (Visualizações)
+
+OBSERVAÇÕES
+--------------------------------------------------------------------------------
+[ADICIONAR QUALQUER OBSERVAÇÃO RELEVANTE]
+
+================================================================================
+FIM DO DOCUMENTO
+================================================================================
+
