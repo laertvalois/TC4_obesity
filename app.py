@@ -332,8 +332,15 @@ with tab2:
                 st.markdown("---")
                 st.header("📊 Resultado da Predição")
                 
+                # Converter prediction para string se necessário
+                if isinstance(prediction, (np.integer, int)):
+                    # Se prediction é um índice, converter para string usando classes
+                    prediction_str = classes[prediction] if prediction < len(classes) else str(prediction)
+                else:
+                    prediction_str = str(prediction)
+                
                 # Resultado principal
-                prediction_pt = OBESITY_LEVELS_PT.get(prediction, prediction)
+                prediction_pt = OBESITY_LEVELS_PT.get(prediction_str, prediction_str)
                 
                 # Container para resultado
                 result_container = st.container()
@@ -344,7 +351,10 @@ with tab2:
                         st.markdown(f"# {prediction_pt}")
                         
                         # Probabilidade da classe predita
-                        pred_idx = list(classes).index(prediction)
+                        if isinstance(prediction, (np.integer, int)):
+                            pred_idx = prediction
+                        else:
+                            pred_idx = list(classes).index(prediction_str) if prediction_str in classes else 0
                         confidence = probabilities[pred_idx] * 100
                         st.progress(confidence / 100)
                         st.caption(f"Confiança: {confidence:.2f}%")
@@ -369,16 +379,16 @@ with tab2:
                     color_continuous_scale='Reds'
                 )
                 fig.update_layout(showlegend=False)
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
                 
                 # Tabela
-                st.dataframe(prob_df, use_container_width=True, hide_index=True)
+                st.dataframe(prob_df, width='stretch', hide_index=True)
                 
                 # Recomendações
                 st.markdown("---")
                 st.subheader("💡 Recomendações")
                 
-                if 'Obesity' in prediction or 'Overweight' in prediction:
+                if 'Obesity' in prediction_str or 'Overweight' in prediction_str:
                     st.warning("""
                     **Atenção:** O modelo indica risco de sobrepeso/obesidade. Recomenda-se:
                     - Consultar um profissional de saúde
@@ -386,7 +396,7 @@ with tab2:
                     - Aumentar atividade física regular
                     - Monitorar peso e IMC periodicamente
                     """)
-                elif prediction == 'Normal_Weight':
+                elif prediction_str == 'Normal_Weight':
                     st.success("""
                     **Peso Normal:** Mantenha hábitos saudáveis:
                     - Continue com alimentação balanceada
@@ -488,7 +498,7 @@ with tab3:
             color_continuous_scale='Reds'
         )
         fig_dist.update_layout(showlegend=False)
-        st.plotly_chart(fig_dist, use_container_width=True)
+        st.plotly_chart(fig_dist, width='stretch')
         
         st.markdown("### 🔹 Correlação entre Variáveis")
         try:
@@ -511,7 +521,7 @@ with tab3:
             title='Distribuição de Obesidade por Gênero',
             labels={'value': 'Percentual (%)', 'Gender': 'Gênero'}
         )
-        st.plotly_chart(fig_gender, use_container_width=True)
+        st.plotly_chart(fig_gender, width='stretch')
         
         # Análise por idade
         st.markdown("#### Relação Idade vs Obesidade")
@@ -525,7 +535,7 @@ with tab3:
             labels={'x': 'Faixa Etária', 'y': 'IMC Médio'},
             markers=True
         )
-        st.plotly_chart(fig_age, use_container_width=True)
+        st.plotly_chart(fig_age, width='stretch')
         
         # Scatter plot: Idade vs IMC
         fig_scatter = px.scatter(
@@ -537,7 +547,7 @@ with tab3:
             labels={'Age': 'Idade', 'BMI': 'IMC'},
             hover_data=['Gender', 'Weight', 'Height']
         )
-        st.plotly_chart(fig_scatter, use_container_width=True)
+        st.plotly_chart(fig_scatter, width='stretch')
         
         # Análise de atividade física
         st.markdown("#### Impacto da Atividade Física")
@@ -547,7 +557,7 @@ with tab3:
             title='Taxa de Obesidade por Nível de Atividade Física',
             labels={'value': 'Taxa de Obesidade (%)', 'FAF': 'Frequência de Atividade Física'}
         )
-        st.plotly_chart(fig_activity, use_container_width=True)
+        st.plotly_chart(fig_activity, width='stretch')
         
         st.markdown("---")
         
