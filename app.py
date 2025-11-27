@@ -52,9 +52,87 @@ if page == "Previsão de Obesidade":
     # Prever
     if st.button("Classificar"):
         df_input = pd.DataFrame([user_input])
+        
+        # --- Feature Engineering (igual ao treinamento) ---
+        # 1. Criar IMC
+        df_input['BMI'] = df_input['Weight'] / (df_input['Height'] ** 2)
+        
+        # 2. Criar categoria de IMC
+        def categorize_bmi(bmi):
+            if bmi < 18.5:
+                return 'Underweight'
+            elif bmi < 25:
+                return 'Normal'
+            elif bmi < 30:
+                return 'Overweight'
+            elif bmi < 35:
+                return 'Obese_I'
+            elif bmi < 40:
+                return 'Obese_II'
+            else:
+                return 'Obese_III'
+        
+        df_input['BMI_Category'] = df_input['BMI'].apply(categorize_bmi)
+        
+        # 3. Codificar todas as variáveis categóricas (exceto Obesity)
         for col, le in label_encoders.items():
-            if col in df_input.columns:
-                df_input[col] = le.transform(df_input[col])
+            if col in df_input.columns and col != 'Obesity':
+                try:
+                    df_input[col] = le.transform(df_input[col].astype(str))
+                except:
+                    # Se valor não estiver no encoder, usar o primeiro valor
+                    df_input[col] = 0
+        
+        # 4. Criar Risk Score após codificação
+        # Encontrar índices de 'yes' nos encoders
+        try:
+            favc_le = label_encoders.get('FAVC')
+            family_le = label_encoders.get('family_history')
+            
+            if favc_le is not None and family_le is not None:
+                # Encontrar índice de 'yes' em cada encoder
+                yes_favc_idx = None
+                yes_family_idx = None
+                
+                for i, val in enumerate(favc_le.classes_):
+                    if str(val).lower() == 'yes':
+                        yes_favc_idx = i
+                        break
+                
+                for i, val in enumerate(family_le.classes_):
+                    if str(val).lower() == 'yes':
+                        yes_family_idx = i
+                        break
+                
+                # Se não encontrar 'yes', usar 1 como padrão
+                if yes_favc_idx is None:
+                    yes_favc_idx = 1 if len(favc_le.classes_) > 1 else 0
+                if yes_family_idx is None:
+                    yes_family_idx = 1 if len(family_le.classes_) > 1 else 0
+                
+                # Criar Risk Score
+                df_input['Risk_Score'] = (
+                    (df_input['FAVC'] == yes_favc_idx).astype(int) +
+                    (df_input['family_history'] == yes_family_idx).astype(int) -
+                    (df_input['FAF'] / 3.0) +
+                    (df_input['TUE'] / 2.0)
+                )
+            else:
+                # Fallback simples
+                df_input['Risk_Score'] = df_input['FAVC'] + df_input['family_history'] - (df_input['FAF'] / 3.0) + (df_input['TUE'] / 2.0)
+        except Exception as e:
+            # Fallback em caso de erro
+            df_input['Risk_Score'] = df_input.get('FAVC', 0) + df_input.get('family_history', 0) - (df_input.get('FAF', 0) / 3.0) + (df_input.get('TUE', 0) / 2.0)
+        
+        # 5. Garantir que todas as colunas esperadas estejam presentes e na ordem correta
+        expected_cols = columns if isinstance(columns, list) else list(columns)
+        for col in expected_cols:
+            if col not in df_input.columns:
+                df_input[col] = 0  # Valor padrão para colunas faltantes
+        
+        # Reordenar colunas na ordem esperada pelo modelo
+        df_input = df_input[expected_cols]
+        
         df_scaled = scaler.transform(df_input)
         pred = model.predict(df_scaled)[0]
         inv_pred = list(label_encoders["Obesity"].inverse_transform([pred]))[0]
@@ -108,21 +186,21 @@ elif page == "Insights e Métricas":
         st.markdown("### 🔹 Comparação de Acurácia entre Modelos")
         try:
             img_comp = Image.open("graphs/model_comparison.png")
-            st.image(img_comp, caption="Comparação de Acurácia entre os Modelos", use_container_width=True)
+            st.image(img_comp, caption="Comparação de Acurácia entre os Modelos", width='stretch')
         except:
             st.warning("Imagem não encontrada. Execute train_model.py primeiro.")
 
         st.markdown("### 🔹 Matriz de Confusão")
         try:
             img_conf = Image.open("graphs/confusion_matrix.png")
-            st.image(img_conf, caption="Matriz de Confusão do Melhor Modelo", use_container_width=True)
+            st.image(img_conf, caption="Matriz de Confusão do Melhor Modelo", width='stretch')
         except:
             st.warning("Matriz de confusão não encontrada.")
 
         st.markdown("### 🔹 Importância das Features")
         try:
             img_feat = Image.open("graphs/feature_importance.png")
-            st.image(img_feat, caption="Top 15 Features Mais Importantes", use_container_width=True)
+            st.image(img_feat, caption="Top 15 Features Mais Importantes", width='stretch')
         except:
             st.warning("Gráfico de importância não encontrado.")
 
@@ -134,7 +212,7 @@ elif page == "Insights e Métricas":
         st.markdown("### 🔹 Distribuição das Classes de Obesidade")
         try:
             img_dist = Image.open("graphs/target_distribution.png")
-            st.image(img_dist, caption="Distribuição das Classes", use_container_width=True)
+            st.image(img_dist, caption="Distribuição das Classes", width='stretch')
         except:
             # Criar gráfico inline se não existir
             import matplotlib.pyplot as plt
@@ -150,7 +228,7 @@ elif page == "Insights e Métricas":
         st.markdown("### 🔹 Correlação entre Variáveis")
         try:
             img_corr = Image.open("graphs/correlation_heatmap.png")
-            st.image(img_corr, caption="Mapa de Correlação entre Variáveis", use_container_width=True)
+            st.image(img_corr, caption="Mapa de Correlação entre Variáveis", width='stretch')
         except:
             st.warning("Mapa de correlação não encontrado.")
         
@@ -196,7 +274,7 @@ elif page == "Insights e Métricas":
         st.markdown("#### Relação Idade vs Obesidade")
         df['BMI'] = df['Weight'] / (df['Height'] ** 2)
         df['Age_Group'] = pd.cut(df['Age'], bins=[0, 20, 30, 40, 50, 100], labels=['<20', '20-30', '30-40', '40-50', '50+'])
-        age_bmi = df.groupby('Age_Group')['BMI'].mean()
+        age_bmi = df.groupby('Age_Group', observed=True)['BMI'].mean()
         st.line_chart(age_bmi)
         
         # Análise de atividade física
