@@ -1,156 +1,408 @@
+"""
+Aplicação Streamlit Unificada - Sistema Preditivo de Obesidade
+Tech Challenge 4 - FIAP
+"""
 import streamlit as st
 import pandas as pd
 import pickle
 import numpy as np
 from PIL import Image
+import plotly.express as px
+import plotly.graph_objects as go
+
+# Configuração da página
+st.set_page_config(
+    page_title="Sistema Preditivo de Obesidade",
+    page_icon="🏥",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 # --- Carregar modelo e artefatos ---
-with open('model/obesity_model.pkl', 'rb') as f:
-    data = pickle.load(f)
+@st.cache_data
+def load_model():
+    """Carrega o modelo e pré-processador"""
+    with open('model/obesity_model.pkl', 'rb') as f:
+        data = pickle.load(f)
+    return data
 
-model = data['model']
-scaler = data['scaler']
-label_encoders = data['label_encoders']
-columns = data['columns']
+try:
+    model_data = load_model()
+    model = model_data['model']
+    scaler = model_data['scaler']
+    label_encoders = model_data['label_encoders']
+    columns = model_data['columns']
+    model_name = model_data.get('model_name', 'Random Forest')
+    model_accuracy = model_data.get('accuracy', 0.9886)
+except Exception as e:
+    st.error(f"Erro ao carregar modelo: {str(e)}")
+    st.stop()
 
-# --- Sidebar de navegação ---
-st.sidebar.title("Navegação")
-page = st.sidebar.radio("Ir para:", ["Previsão de Obesidade", "Insights e Métricas"])
+# Mapeamento de níveis de obesidade para português
+OBESITY_LEVELS_PT = {
+    'Normal_Weight': 'Peso Normal',
+    'Overweight_Level_I': 'Sobrepeso Nível I',
+    'Overweight_Level_II': 'Sobrepeso Nível II',
+    'Obesity_Type_I': 'Obesidade Tipo I',
+    'Obesity_Type_II': 'Obesidade Tipo II',
+    'Obesity_Type_III': 'Obesidade Tipo III',
+    'Insufficient_Weight': 'Peso Insuficiente'
+}
 
-# --- Página 1: Previsão ---
-if page == "Previsão de Obesidade":
-    st.title("🏥 Preditor de Nível de Obesidade")
-    st.markdown("Responda as perguntas abaixo para estimar o nível de obesidade:")
-
-    # Perguntas categóricas
-    user_input = {}
-    user_input["Gender"] = st.selectbox("Gênero:", ["Male", "Female"])
-    user_input["Age"] = st.slider("Idade (anos):", 10, 80, 25)
-    user_input["Height"] = st.number_input("Altura (m):", min_value=1.20, max_value=2.10, value=1.70, step=0.01)
-    user_input["Weight"] = st.number_input("Peso (kg):", min_value=30.0, max_value=200.0, value=70.0, step=0.1)
-    user_input["family_history"] = st.selectbox("Algum membro da família sofre ou sofreu de obesidade?", ["no", "yes"])
-
-    st.subheader("Hábitos alimentares")
-    user_input["FAVC"] = st.selectbox("Você come alimentos altamente calóricos com frequência?", ["no", "yes"])
-    user_input["FCVC"] = st.slider("Você costuma comer vegetais nas refeições? (1=nunca, 3=sempre)", 1, 3, 2)
-    user_input["NCP"] = st.slider("Quantas refeições principais você faz por dia?", 1, 4, 3)
-    user_input["CAEC"] = st.selectbox("Você come algo entre as refeições?", ["no", "Sometimes", "Frequently", "Always"])
-    user_input["SMOKE"] = st.selectbox("Você fuma?", ["no", "yes"])
-
-    st.subheader("Hábitos diários")
-    user_input["CH2O"] = st.slider("Quanta água você bebe por dia? (1=pouca, 3=muita)", 1, 3, 2)
-    user_input["SCC"] = st.selectbox("Você monitora as calorias que ingere?", ["no", "yes"])
-    user_input["FAF"] = st.slider("Com que frequência pratica atividade física? (0=nunca, 3=frequente)", 0, 3, 2)
-    user_input["TUE"] = st.slider("Tempo de uso de dispositivos eletrônicos (0=baixo, 2=alto)", 0, 2, 1)
+# Sidebar com informações
+with st.sidebar:
+    st.header("ℹ️ Sobre o Sistema")
+    st.markdown(f"""
+    Este sistema foi desenvolvido como parte do Tech Challenge 4.
     
-    # Calcular IMC automaticamente
-    bmi = user_input["Weight"] / (user_input["Height"] ** 2)
-    st.info(f"📊 **IMC Calculado:** {bmi:.2f} kg/m²")
-    user_input["CALC"] = st.selectbox("Com que frequência você bebe álcool?", ["no", "Sometimes", "Frequently", "Always"])
-    user_input["MTRANS"] = st.selectbox("Meio de transporte principal:", ["Automobile", "Bike", "Motorbike", "Public_Transportation", "Walking"])
+    **Funcionalidades:**
+    - Predição do nível de obesidade
+    - Análise de probabilidades por classe
+    - Dashboard com insights analíticos
+    - Recomendações baseadas nos dados
+    
+    **Modelo:**
+    - Algoritmo: {model_name}
+    - Acurácia: {model_accuracy:.2%}
+    """)
+    st.markdown("---")
+    st.markdown("**Desenvolvido para auxiliar profissionais de saúde**")
 
-    # Prever
-    if st.button("Classificar"):
-        df_input = pd.DataFrame([user_input])
+# Criar abas
+tab1, tab2, tab3 = st.tabs(["🏠 Início", "🔮 Predição", "📊 Insights e Métricas"])
+
+# ===== ABA 1: INÍCIO =====
+with tab1:
+    st.header("Bem-vindo ao Sistema Preditivo de Obesidade")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+        ### 🎯 Objetivo
         
-        # --- Feature Engineering (igual ao treinamento) ---
-        # 1. Criar IMC
-        df_input['BMI'] = df_input['Weight'] / (df_input['Height'] ** 2)
+        Este sistema utiliza Machine Learning para auxiliar médicos e médicas 
+        na previsão do nível de obesidade de pacientes, fornecendo ferramentas 
+        para auxiliar na tomada de decisão clínica.
         
-        # 2. Criar categoria de IMC
-        def categorize_bmi(bmi):
-            if bmi < 18.5:
-                return 'Underweight'
-            elif bmi < 25:
-                return 'Normal'
-            elif bmi < 30:
-                return 'Overweight'
-            elif bmi < 35:
-                return 'Obese_I'
-            elif bmi < 40:
-                return 'Obese_II'
-            else:
-                return 'Obese_III'
+        ### 🔮 Predição
         
-        df_input['BMI_Category'] = df_input['BMI'].apply(categorize_bmi)
+        Na aba **Predição**, você pode:
+        - Preencher dados do paciente
+        - Obter predição do nível de obesidade
+        - Ver probabilidades por classe
+        - Receber recomendações personalizadas
+        """)
+    
+    with col2:
+        st.markdown("""
+        ### 📊 Insights e Métricas
         
-        # 3. Codificar todas as variáveis categóricas (exceto Obesity)
-        for col, le in label_encoders.items():
-            if col in df_input.columns and col != 'Obesity':
-                try:
-                    df_input[col] = le.transform(df_input[col].astype(str))
-                except:
-                    # Se valor não estiver no encoder, usar o primeiro valor
-                    df_input[col] = 0
+        Na aba **Insights e Métricas**, você encontra:
+        - Visualizações interativas dos dados
+        - Análises e insights sobre obesidade
+        - Métricas do modelo
+        - Recomendações clínicas
         
-        # 4. Criar Risk Score após codificação
-        # Encontrar índices de 'yes' nos encoders
+        ### 📈 Recursos
+        
+        - Modelo com {:.2%} de acurácia
+        - Interface intuitiva e profissional
+        - Análises baseadas em dados reais
+        """.format(model_accuracy))
+    
+    st.markdown("---")
+    
+    st.subheader("🚀 Como Usar")
+    
+    st.markdown("""
+    1. **Para fazer uma predição:**
+       - Navegue para a aba "🔮 Predição"
+       - Preencha o formulário com os dados do paciente
+       - Clique em "Fazer Predição"
+       - Analise os resultados e recomendações
+    
+    2. **Para análise de dados:**
+       - Navegue para a aba "📊 Insights e Métricas"
+       - Explore os gráficos e insights apresentados
+       - Analise as métricas do modelo
+    """)
+    
+    st.markdown("---")
+    
+    st.subheader("📋 Informações Técnicas")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("Acurácia do Modelo", f"{model_accuracy:.2%}")
+    
+    with col2:
         try:
-            favc_le = label_encoders.get('FAVC')
-            family_le = label_encoders.get('family_history')
+            df_temp = pd.read_csv('data/Obesity.csv')
+            st.metric("Total de Registros", f"{len(df_temp):,}")
+        except:
+            st.metric("Total de Registros", "2.111")
+    
+    with col3:
+        st.metric("Variáveis de Entrada", len(columns) if isinstance(columns, list) else len(columns))
+
+# ===== ABA 2: PREDIÇÃO =====
+with tab2:
+    st.header("🔮 Predição de Nível de Obesidade")
+    st.markdown("Preencha os dados abaixo para obter uma predição do nível de obesidade.")
+    
+    # Função para criar formulário
+    def create_input_form():
+        """Cria formulário de entrada de dados"""
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("📊 Dados Demográficos")
+            gender = st.selectbox("Gênero", ["Male", "Female"])
+            age = st.number_input("Idade", min_value=1, max_value=120, value=30)
+            height = st.number_input("Altura (metros)", min_value=0.5, max_value=2.5, value=1.70, step=0.01)
+            weight = st.number_input("Peso (kg)", min_value=10.0, max_value=300.0, value=70.0, step=0.1)
             
-            if favc_le is not None and family_le is not None:
-                # Encontrar índice de 'yes' em cada encoder
-                yes_favc_idx = None
-                yes_family_idx = None
+            # Calcular IMC
+            if height > 0:
+                bmi = weight / (height ** 2)
+                st.info(f"**IMC Calculado:** {bmi:.2f} kg/m²")
+        
+        with col2:
+            st.subheader("🍽️ Hábitos Alimentares")
+            family_history = st.selectbox("Histórico familiar de excesso de peso", ["yes", "no"])
+            favc = st.selectbox("Come alimentos altamente calóricos com frequência?", ["yes", "no"])
+            fcvc = st.number_input("Frequência de consumo de vegetais (1-3)", min_value=1.0, max_value=3.0, value=2.0, step=0.1)
+            ncp = st.number_input("Número de refeições principais diárias (1-4)", min_value=1.0, max_value=4.0, value=3.0, step=0.1)
+            caec = st.selectbox("Come algo entre as refeições?", ["no", "Sometimes", "Frequently", "Always"])
+            ch2o = st.number_input("Quantidade de água diária (1-3)", min_value=1.0, max_value=3.0, value=2.0, step=0.1)
+            scc = st.selectbox("Monitora as calorias ingeridas?", ["yes", "no"])
+        
+        st.markdown("---")
+        
+        col3, col4 = st.columns(2)
+        
+        with col3:
+            st.subheader("🏃 Estilo de Vida")
+            smoke = st.selectbox("Fuma?", ["yes", "no"])
+            faf = st.number_input("Frequência de atividade física (0-3)", min_value=0.0, max_value=3.0, value=1.0, step=0.1)
+            tue = st.number_input("Tempo em dispositivos tecnológicos (0-2)", min_value=0.0, max_value=2.0, value=1.0, step=0.1)
+            calc = st.selectbox("Frequência de consumo de álcool", ["no", "Sometimes", "Frequently", "Always"])
+        
+        with col4:
+            st.subheader("🚗 Transporte")
+            mtrans = st.selectbox("Meio de transporte", [
+                "Public_Transportation",
+                "Automobile",
+                "Walking",
+                "Motorbike",
+                "Bike"
+            ])
+        
+        return {
+            'Gender': gender,
+            'Age': age,
+            'Height': height,
+            'Weight': weight,
+            'family_history': family_history,
+            'FAVC': favc,
+            'FCVC': fcvc,
+            'NCP': ncp,
+            'CAEC': caec,
+            'SMOKE': smoke,
+            'CH2O': ch2o,
+            'SCC': scc,
+            'FAF': faf,
+            'TUE': tue,
+            'CALC': calc,
+            'MTRANS': mtrans
+        }
+    
+    # Função para fazer predição
+    def make_prediction(input_data):
+        """Faz predição usando o modelo treinado"""
+        try:
+            df_input = pd.DataFrame([input_data])
+            
+            # --- Feature Engineering (igual ao treinamento) ---
+            # 1. Criar IMC
+            df_input['BMI'] = df_input['Weight'] / (df_input['Height'] ** 2)
+            
+            # 2. Criar categoria de IMC
+            def categorize_bmi(bmi):
+                if bmi < 18.5:
+                    return 'Underweight'
+                elif bmi < 25:
+                    return 'Normal'
+                elif bmi < 30:
+                    return 'Overweight'
+                elif bmi < 35:
+                    return 'Obese_I'
+                elif bmi < 40:
+                    return 'Obese_II'
+                else:
+                    return 'Obese_III'
+            
+            df_input['BMI_Category'] = df_input['BMI'].apply(categorize_bmi)
+            
+            # 3. Codificar todas as variáveis categóricas (exceto Obesity)
+            for col, le in label_encoders.items():
+                if col in df_input.columns and col != 'Obesity':
+                    try:
+                        df_input[col] = le.transform(df_input[col].astype(str))
+                    except:
+                        df_input[col] = 0
+            
+            # 4. Criar Risk Score após codificação
+            try:
+                favc_le = label_encoders.get('FAVC')
+                family_le = label_encoders.get('family_history')
                 
-                for i, val in enumerate(favc_le.classes_):
-                    if str(val).lower() == 'yes':
-                        yes_favc_idx = i
-                        break
-                
-                for i, val in enumerate(family_le.classes_):
-                    if str(val).lower() == 'yes':
-                        yes_family_idx = i
-                        break
-                
-                # Se não encontrar 'yes', usar 1 como padrão
-                if yes_favc_idx is None:
-                    yes_favc_idx = 1 if len(favc_le.classes_) > 1 else 0
-                if yes_family_idx is None:
-                    yes_family_idx = 1 if len(family_le.classes_) > 1 else 0
-                
-                # Criar Risk Score
-                df_input['Risk_Score'] = (
-                    (df_input['FAVC'] == yes_favc_idx).astype(int) +
-                    (df_input['family_history'] == yes_family_idx).astype(int) -
-                    (df_input['FAF'] / 3.0) +
-                    (df_input['TUE'] / 2.0)
-                )
-            else:
-                # Fallback simples
-                df_input['Risk_Score'] = df_input['FAVC'] + df_input['family_history'] - (df_input['FAF'] / 3.0) + (df_input['TUE'] / 2.0)
+                if favc_le is not None and family_le is not None:
+                    yes_favc_idx = None
+                    yes_family_idx = None
+                    
+                    for i, val in enumerate(favc_le.classes_):
+                        if str(val).lower() == 'yes':
+                            yes_favc_idx = i
+                            break
+                    
+                    for i, val in enumerate(family_le.classes_):
+                        if str(val).lower() == 'yes':
+                            yes_family_idx = i
+                            break
+                    
+                    if yes_favc_idx is None:
+                        yes_favc_idx = 1 if len(favc_le.classes_) > 1 else 0
+                    if yes_family_idx is None:
+                        yes_family_idx = 1 if len(family_le.classes_) > 1 else 0
+                    
+                    df_input['Risk_Score'] = (
+                        (df_input['FAVC'] == yes_favc_idx).astype(int) +
+                        (df_input['family_history'] == yes_family_idx).astype(int) -
+                        (df_input['FAF'] / 3.0) +
+                        (df_input['TUE'] / 2.0)
+                    )
+                else:
+                    df_input['Risk_Score'] = df_input['FAVC'] + df_input['family_history'] - (df_input['FAF'] / 3.0) + (df_input['TUE'] / 2.0)
+            except:
+                df_input['Risk_Score'] = df_input.get('FAVC', 0) + df_input.get('family_history', 0) - (df_input.get('FAF', 0) / 3.0) + (df_input.get('TUE', 0) / 2.0)
+            
+            # 5. Garantir que todas as colunas esperadas estejam presentes e na ordem correta
+            expected_cols = columns if isinstance(columns, list) else list(columns)
+            for col in expected_cols:
+                if col not in df_input.columns:
+                    df_input[col] = 0
+            
+            # Reordenar colunas na ordem esperada pelo modelo
+            df_input = df_input[expected_cols]
+            
+            df_scaled = scaler.transform(df_input)
+            prediction = model.predict(df_scaled)[0]
+            probabilities = model.predict_proba(df_scaled)[0]
+            classes = model.classes_
+            
+            return prediction, probabilities, classes
+            
         except Exception as e:
-            # Fallback em caso de erro
-            df_input['Risk_Score'] = df_input.get('FAVC', 0) + df_input.get('family_history', 0) - (df_input.get('FAF', 0) / 3.0) + (df_input.get('TUE', 0) / 2.0)
-        
-        # 5. Garantir que todas as colunas esperadas estejam presentes e na ordem correta
-        expected_cols = columns if isinstance(columns, list) else list(columns)
-        for col in expected_cols:
-            if col not in df_input.columns:
-                df_input[col] = 0  # Valor padrão para colunas faltantes
-        
-        # Reordenar colunas na ordem esperada pelo modelo
-        df_input = df_input[expected_cols]
-        
-        df_scaled = scaler.transform(df_input)
-        pred = model.predict(df_scaled)[0]
-        inv_pred = list(label_encoders["Obesity"].inverse_transform([pred]))[0]
+            st.error(f"Erro ao fazer predição: {str(e)}")
+            return None, None, None
+    
+    # Interface principal
+    st.subheader("📝 Formulário de Entrada")
+    
+    # Criar formulário
+    input_data = create_input_form()
+    
+    # Botão de predição
+    st.markdown("---")
+    col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
+    
+    with col_btn2:
+        predict_button = st.button("🔮 Fazer Predição", type="primary", use_container_width=True)
+    
+    # Fazer predição
+    if predict_button:
+        with st.spinner("Processando predição..."):
+            prediction, probabilities, classes = make_prediction(input_data)
+            
+            if prediction is not None:
+                st.markdown("---")
+                st.header("📊 Resultado da Predição")
+                
+                # Resultado principal
+                prediction_pt = OBESITY_LEVELS_PT.get(prediction, prediction)
+                
+                # Container para resultado
+                result_container = st.container()
+                with result_container:
+                    col1, col2, col3 = st.columns([1, 2, 1])
+                    with col2:
+                        st.markdown(f"### 🎯 Nível de Obesidade Previsto:")
+                        st.markdown(f"# {prediction_pt}")
+                        
+                        # Probabilidade da classe predita
+                        pred_idx = list(classes).index(prediction)
+                        confidence = probabilities[pred_idx] * 100
+                        st.progress(confidence / 100)
+                        st.caption(f"Confiança: {confidence:.2f}%")
+                
+                # Probabilidades por classe
+                st.markdown("---")
+                st.subheader("📈 Probabilidades por Classe")
+                
+                # Criar DataFrame com probabilidades
+                prob_df = pd.DataFrame({
+                    'Nível de Obesidade': [OBESITY_LEVELS_PT.get(c, c) for c in classes],
+                    'Probabilidade (%)': [p * 100 for p in probabilities]
+                }).sort_values('Probabilidade (%)', ascending=False)
+                
+                # Gráfico de barras
+                fig = px.bar(
+                    prob_df,
+                    x='Nível de Obesidade',
+                    y='Probabilidade (%)',
+                    title='Probabilidades por Classe',
+                    color='Probabilidade (%)',
+                    color_continuous_scale='Reds'
+                )
+                fig.update_layout(showlegend=False)
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # Tabela
+                st.dataframe(prob_df, use_container_width=True, hide_index=True)
+                
+                # Recomendações
+                st.markdown("---")
+                st.subheader("💡 Recomendações")
+                
+                if 'Obesity' in prediction or 'Overweight' in prediction:
+                    st.warning("""
+                    **Atenção:** O modelo indica risco de sobrepeso/obesidade. Recomenda-se:
+                    - Consultar um profissional de saúde
+                    - Avaliar hábitos alimentares
+                    - Aumentar atividade física regular
+                    - Monitorar peso e IMC periodicamente
+                    """)
+                elif prediction == 'Normal_Weight':
+                    st.success("""
+                    **Peso Normal:** Mantenha hábitos saudáveis:
+                    - Continue com alimentação balanceada
+                    - Mantenha atividade física regular
+                    - Monitore peso periodicamente
+                    """)
+                else:
+                    st.info("""
+                    **Peso Insuficiente:** Consulte um nutricionista para:
+                    - Avaliar necessidades nutricionais
+                    - Desenvolver plano alimentar adequado
+                    - Monitorar ganho de peso saudável
+                    """)
 
-        # Calcular probabilidades
-        proba = model.predict_proba(df_scaled)[0]
-        proba_dict = dict(zip(label_encoders["Obesity"].classes_, proba))
-        sorted_proba = sorted(proba_dict.items(), key=lambda x: x[1], reverse=True)
-        
-        st.success(f"🏷️ **Nível de obesidade previsto: {inv_pred}**")
-        
-        st.subheader("📊 Probabilidades por Classe:")
-        for classe, prob in sorted_proba[:3]:  # Top 3
-            bar_color = "🟢" if prob < 0.3 else "🟡" if prob < 0.6 else "🔴"
-            st.progress(prob, text=f"{bar_color} {classe}: {prob:.1%}")
-
-# --- Página 2: Dashboard Analítico ---
-elif page == "Insights e Métricas":
+# ===== ABA 3: INSIGHTS E MÉTRICAS =====
+with tab3:
     st.title("📊 Dashboard Analítico - Previsão de Obesidade")
     st.markdown("### Visão estratégica para equipe médica")
     
@@ -225,6 +477,19 @@ elif page == "Insights e Métricas":
             plt.tight_layout()
             st.pyplot(fig)
         
+        # Gráfico interativo com Plotly
+        obesity_counts = df['Obesity'].value_counts()
+        fig_dist = px.bar(
+            x=obesity_counts.index,
+            y=obesity_counts.values,
+            labels={'x': 'Nível de Obesidade', 'y': 'Frequência'},
+            title='Distribuição de Níveis de Obesidade (Interativo)',
+            color=obesity_counts.values,
+            color_continuous_scale='Reds'
+        )
+        fig_dist.update_layout(showlegend=False)
+        st.plotly_chart(fig_dist, use_container_width=True)
+        
         st.markdown("### 🔹 Correlação entre Variáveis")
         try:
             img_corr = Image.open("graphs/correlation_heatmap.png")
@@ -234,7 +499,59 @@ elif page == "Insights e Métricas":
         
         st.markdown("---")
         
-        # Seção 3: Insights para Equipe Médica
+        # Seção 3: Análises Interativas
+        st.header("📊 Análises Interativas")
+        
+        # Análise por gênero
+        st.markdown("#### Distribuição por Gênero")
+        gender_obesity = pd.crosstab(df['Gender'], df['Obesity'], normalize='index') * 100
+        fig_gender = px.bar(
+            gender_obesity,
+            barmode='group',
+            title='Distribuição de Obesidade por Gênero',
+            labels={'value': 'Percentual (%)', 'Gender': 'Gênero'}
+        )
+        st.plotly_chart(fig_gender, use_container_width=True)
+        
+        # Análise por idade
+        st.markdown("#### Relação Idade vs Obesidade")
+        df['BMI'] = df['Weight'] / (df['Height'] ** 2)
+        df['Age_Group'] = pd.cut(df['Age'], bins=[0, 20, 30, 40, 50, 100], labels=['<20', '20-30', '30-40', '40-50', '50+'])
+        age_bmi = df.groupby('Age_Group', observed=True)['BMI'].mean()
+        fig_age = px.line(
+            x=age_bmi.index,
+            y=age_bmi.values,
+            title='IMC Médio por Faixa Etária',
+            labels={'x': 'Faixa Etária', 'y': 'IMC Médio'},
+            markers=True
+        )
+        st.plotly_chart(fig_age, use_container_width=True)
+        
+        # Scatter plot: Idade vs IMC
+        fig_scatter = px.scatter(
+            df,
+            x='Age',
+            y='BMI',
+            color='Obesity',
+            title='Relação entre Idade e IMC',
+            labels={'Age': 'Idade', 'BMI': 'IMC'},
+            hover_data=['Gender', 'Weight', 'Height']
+        )
+        st.plotly_chart(fig_scatter, use_container_width=True)
+        
+        # Análise de atividade física
+        st.markdown("#### Impacto da Atividade Física")
+        activity_obesity = pd.crosstab(df['FAF'], df['Obesity'].str.contains('Obesity', case=False), normalize='index') * 100
+        fig_activity = px.bar(
+            activity_obesity,
+            title='Taxa de Obesidade por Nível de Atividade Física',
+            labels={'value': 'Taxa de Obesidade (%)', 'FAF': 'Frequência de Atividade Física'}
+        )
+        st.plotly_chart(fig_activity, use_container_width=True)
+        
+        st.markdown("---")
+        
+        # Seção 4: Insights para Equipe Médica
         st.header("💡 Insights Estratégicos para Equipe Médica")
         
         # Análises específicas
@@ -262,28 +579,6 @@ elif page == "Insights e Métricas":
         
         st.markdown("---")
         
-        # Análises interativas
-        st.subheader("📊 Análises Interativas")
-        
-        # Análise por gênero
-        st.markdown("#### Distribuição por Gênero")
-        gender_obesity = pd.crosstab(df['Gender'], df['Obesity'], normalize='index') * 100
-        st.bar_chart(gender_obesity)
-        
-        # Análise por idade
-        st.markdown("#### Relação Idade vs Obesidade")
-        df['BMI'] = df['Weight'] / (df['Height'] ** 2)
-        df['Age_Group'] = pd.cut(df['Age'], bins=[0, 20, 30, 40, 50, 100], labels=['<20', '20-30', '30-40', '40-50', '50+'])
-        age_bmi = df.groupby('Age_Group', observed=True)['BMI'].mean()
-        st.line_chart(age_bmi)
-        
-        # Análise de atividade física
-        st.markdown("#### Impacto da Atividade Física")
-        activity_obesity = pd.crosstab(df['FAF'], df['Obesity'].str.contains('Obesity', case=False), normalize='index') * 100
-        st.bar_chart(activity_obesity)
-        
-        st.markdown("---")
-        
         # Recomendações
         st.header("🎯 Recomendações Clínicas")
         st.markdown("""
@@ -306,3 +601,11 @@ elif page == "Insights e Métricas":
     except Exception as e:
         st.error(f"Erro ao carregar dados: {str(e)}")
         st.info("Certifique-se de que o arquivo data/Obesity.csv existe")
+
+# Rodapé
+st.markdown("---")
+st.markdown("""
+<div style='text-align: center; color: gray;'>
+    <p>Sistema desenvolvido para o Tech Challenge 4 - FIAP | Uso exclusivo para fins educacionais</p>
+</div>
+""", unsafe_allow_html=True)
